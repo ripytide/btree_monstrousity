@@ -35,11 +35,11 @@ pub mod ripytide;
 
 // port of stdlib implementation
 mod liballoc;
-pub use liballoc::collections::{binary_heap, btree_map, btree_set};
+pub use liballoc::collections::btree_map;
 
-#[cfg(not(no_global_oom_handling))]
-#[doc(no_inline)]
-pub use binary_heap::BinaryHeap;
+//#[cfg(not(no_global_oom_handling))]
+//#[doc(no_inline)]
+//pub use binary_heap::BinaryHeap;
 
 #[cfg(not(no_global_oom_handling))]
 #[doc(no_inline)]

@@ -3,7 +3,6 @@ use core::marker::PhantomData;
 use core::mem;
 
 use crate::{
-    default::{OrdStoredKey, OrdTotalOrder},
     polyfill::*,
 };
 
@@ -18,15 +17,15 @@ use Entry::*;
 /// This `enum` is constructed from the [`entry`] method on [`BTreeMap`].
 ///
 /// [`entry`]: BTreeMap::entry
-pub enum Entry<'a, K: 'a, V: 'a, O, A: Allocator + Clone = Global> {
+pub enum Entry<'a, K: 'a, V: 'a, A: Allocator + Clone = Global> {
     /// A vacant entry.
-    Vacant(VacantEntry<'a, K, V, O, A>),
+    Vacant(VacantEntry<'a, K, V, A>),
 
     /// An occupied entry.
-    Occupied(OccupiedEntry<'a, K, V, O, A>),
+    Occupied(OccupiedEntry<'a, K, V, A>),
 }
 
-impl<K: Debug, V: Debug, O, A: Allocator + Clone> Debug for Entry<'_, K, V, O, A> {
+impl<K: Debug, V: Debug, A: Allocator + Clone> Debug for Entry<'_, K, V, A> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Vacant(ref v) => f.debug_tuple("Entry").field(v).finish(),
@@ -41,13 +40,12 @@ pub struct VacantEntry<
     'a,
     K,
     V,
-    O = OrdTotalOrder<<K as OrdStoredKey>::OrdKeyType>,
     A: Allocator + Clone = Global,
 > {
     pub(super) key: K,
     /// `None` for a (empty) map without root
     pub(super) handle: Option<Handle<NodeRef<marker::Mut<'a>, K, V, marker::Leaf>, marker::Edge>>,
-    pub(super) dormant_map: DormantMutRef<'a, BTreeMap<K, V, O, A>>,
+    pub(super) dormant_map: DormantMutRef<'a, BTreeMap<K, V, A>>,
 
     /// The BTreeMap will outlive this IntoIter so we don't care about drop order for `alloc`.
     pub(super) alloc: A,
@@ -56,7 +54,7 @@ pub struct VacantEntry<
     pub(super) _marker: PhantomData<&'a mut (K, V)>,
 }
 
-impl<K: Debug, V, O, A: Allocator + Clone> Debug for VacantEntry<'_, K, V, O, A> {
+impl<K: Debug, V, A: Allocator + Clone> Debug for VacantEntry<'_, K, V, A> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("VacantEntry").field(self.key()).finish()
     }
@@ -68,11 +66,10 @@ pub struct OccupiedEntry<
     'a,
     K,
     V,
-    O = OrdTotalOrder<<K as OrdStoredKey>::OrdKeyType>,
     A: Allocator + Clone = Global,
 > {
     pub(super) handle: Handle<NodeRef<marker::Mut<'a>, K, V, marker::LeafOrInternal>, marker::KV>,
-    pub(super) dormant_map: DormantMutRef<'a, BTreeMap<K, V, O, A>>,
+    pub(super) dormant_map: DormantMutRef<'a, BTreeMap<K, V, A>>,
 
     /// The BTreeMap will outlive this IntoIter so we don't care about drop order for `alloc`.
     pub(super) alloc: A,
@@ -81,7 +78,7 @@ pub struct OccupiedEntry<
     pub(super) _marker: PhantomData<&'a mut (K, V)>,
 }
 
-impl<K: Debug, V: Debug, O, A: Allocator + Clone> Debug for OccupiedEntry<'_, K, V, O, A> {
+impl<K: Debug, V: Debug, A: Allocator + Clone> Debug for OccupiedEntry<'_, K, V, A> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("OccupiedEntry").field("key", self.key()).field("value", self.get()).finish()
     }
@@ -99,13 +96,13 @@ pub struct OccupiedError<
     A: Allocator + Clone = Global,
 > {
     /// The entry in the map that was already occupied.
-    pub entry: OccupiedEntry<'a, K, V, O, A>,
+    pub entry: OccupiedEntry<'a, K, V, A>,
     /// The value which was not inserted, because the entry was already occupied.
     pub value: V,
 }
 
 #[cfg(feature = "map_try_insert")]
-impl<K: Debug, V: Debug, O, A: Allocator + Clone> Debug for OccupiedError<'_, K, V, O, A> {
+impl<K: Debug, V: Debug, A: Allocator + Clone> Debug for OccupiedError<'_, K, V, A> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("OccupiedError")
             .field("key", self.entry.key())
@@ -116,8 +113,8 @@ impl<K: Debug, V: Debug, O, A: Allocator + Clone> Debug for OccupiedError<'_, K,
 }
 
 #[cfg(feature = "map_try_insert")]
-impl<'a, K: Debug, V: Debug, O, A: Allocator + Clone> fmt::Display
-    for OccupiedError<'a, K, V, O, A>
+impl<'a, K: Debug, V: Debug, A: Allocator + Clone> fmt::Display
+    for OccupiedError<'a, K, V, A>
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -141,7 +138,7 @@ impl<'a, K: core::fmt::Debug, V: core::fmt::Debug, O> core::error::Error
     }
 }
 
-impl<'a, K, V, O, A: Allocator + Clone> Entry<'a, K, V, O, A> {
+impl<'a, K, V, A: Allocator + Clone> Entry<'a, K, V, A> {
     /// Ensures a value is in the entry by inserting the default if empty, and returns
     /// a mutable reference to the value in the entry.
     ///
@@ -264,7 +261,7 @@ impl<'a, K, V, O, A: Allocator + Clone> Entry<'a, K, V, O, A> {
     }
 }
 
-impl<'a, K, V: Default, O, A: Allocator + Clone> Entry<'a, K, V, O, A> {
+impl<'a, K, V: Default, A: Allocator + Clone> Entry<'a, K, V, A> {
     /// Ensures a value is in the entry by inserting the default value if empty,
     /// and returns a mutable reference to the value in the entry.
     ///
@@ -286,7 +283,7 @@ impl<'a, K, V: Default, O, A: Allocator + Clone> Entry<'a, K, V, O, A> {
     }
 }
 
-impl<'a, K, V, O, A: Allocator + Clone> VacantEntry<'a, K, V, O, A> {
+impl<'a, K, V, A: Allocator + Clone> VacantEntry<'a, K, V, A> {
     /// Gets a reference to the key that would be used when inserting a value
     /// through the VacantEntry.
     ///
@@ -374,7 +371,7 @@ impl<'a, K, V, O, A: Allocator + Clone> VacantEntry<'a, K, V, O, A> {
     }
 }
 
-impl<'a, K, V, O, A: Allocator + Clone> OccupiedEntry<'a, K, V, O, A> {
+impl<'a, K, V, A: Allocator + Clone> OccupiedEntry<'a, K, V, A> {
     /// Gets a reference to the key in the entry.
     ///
     /// # Examples

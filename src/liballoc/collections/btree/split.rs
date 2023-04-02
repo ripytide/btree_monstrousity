@@ -3,7 +3,6 @@ use core::cmp::Ordering;
 use super::node::{ForceResult::*, Root};
 use super::search::SearchResult::*;
 use crate::polyfill::*;
-use crate::{SortableByWithOrder, TotalOrder};
 
 impl<K, V> Root<K, V> {
     /// Calculates the length of both trees that result from splitting up
@@ -45,7 +44,7 @@ impl<K, V> Root<K, V> {
         let mut right_node = right_root.borrow_mut();
 
         loop {
-            let mut split_edge = match left_node.search_node(key, order) {
+            let mut split_edge = match left_node.search_node(comp) {
                 // key is going to the right tree
                 Found(kv) => kv.left_edge(),
                 GoDown(edge) => edge,

@@ -29,8 +29,8 @@
 )]
 
 pub mod collections {
-    #[cfg(not(no_global_oom_handling))]
-    pub mod binary_heap;
+    //#[cfg(not(no_global_oom_handling))]
+    //pub mod binary_heap;
 
     #[cfg(not(no_global_oom_handling))]
     mod btree;
@@ -41,11 +41,11 @@ pub mod collections {
         pub use super::btree::map::*;
     }
 
-    #[cfg(not(no_global_oom_handling))]
-    pub mod btree_set {
-        //! An ordered set based on a B-Tree.
-        pub use super::btree::set::*;
-    }
+    //#[cfg(not(no_global_oom_handling))]
+    //pub mod btree_set {
+        ////! An ordered set based on a B-Tree.
+        //pub use super::btree::set::*;
+    //}
 
     /// An intermediate trait for specialization of `Extend`.
     #[doc(hidden)]

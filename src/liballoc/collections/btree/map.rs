@@ -12,7 +12,6 @@ use core::ptr;
 use crate::polyfill::*;
 
 use super::borrow::DormantMutRef;
-use super::dedup_sorted_iter::DedupSortedIter;
 use super::navigate::{LazyLeafRange, LeafRange};
 use super::node::{self, marker, ForceResult::*, Handle, NodeRef, Root};
 use super::search::{SearchBound, SearchResult::*};
@@ -230,11 +229,10 @@ where
 {
 }
 
-impl<K: Clone, V: Clone, O: Clone, A: Allocator + Clone> Clone for BTreeMap<K, V, A> {
+impl<K: Clone, V: Clone, A: Allocator + Clone> Clone for BTreeMap<K, V, A> {
     fn clone(&self) -> BTreeMap<K, V, A> {
-        fn clone_subtree<'a, K: Clone, V: Clone, O: Clone, A: Allocator + Clone>(
+        fn clone_subtree<'a, K: Clone, V: Clone, A: Allocator + Clone>(
             node: NodeRef<marker::Immut<'a>, K, V, marker::LeafOrInternal>,
-            order: &O,
             alloc: A,
         ) -> BTreeMap<K, V, A>
         where
@@ -246,7 +244,6 @@ impl<K: Clone, V: Clone, O: Clone, A: Allocator + Clone> Clone for BTreeMap<K, V
                     let mut out_tree = BTreeMap {
                         root: Some(Root::new(alloc.clone())),
                         length: 0,
-                        order: order.clone(),
                         alloc: ManuallyDrop::new(alloc),
                         _marker: PhantomData,
                     };
@@ -272,7 +269,7 @@ impl<K: Clone, V: Clone, O: Clone, A: Allocator + Clone> Clone for BTreeMap<K, V
                 }
                 Internal(internal) => {
                     let mut out_tree =
-                        clone_subtree(internal.first_edge().descend(), order, alloc.clone());
+                        clone_subtree(internal.first_edge().descend(), alloc.clone());
 
                     {
                         let out_root = out_tree.root.as_mut().unwrap();
@@ -284,7 +281,7 @@ impl<K: Clone, V: Clone, O: Clone, A: Allocator + Clone> Clone for BTreeMap<K, V
 
                             let k = (*k).clone();
                             let v = (*v).clone();
-                            let subtree = clone_subtree(in_edge.descend(), order, alloc.clone());
+                            let subtree = clone_subtree(in_edge.descend(), alloc.clone());
 
                             // We can't destructure subtree directly
                             // because BTreeMap implements Drop
@@ -314,7 +311,6 @@ impl<K: Clone, V: Clone, O: Clone, A: Allocator + Clone> Clone for BTreeMap<K, V
         } else {
             clone_subtree(
                 self.root.as_ref().unwrap().reborrow(),
-                &self.order,
                 (*self.alloc).clone(),
             ) // unwrap succeeds because not empty
         }
@@ -566,7 +562,7 @@ impl<K: fmt::Debug, V: fmt::Debug> fmt::Debug for RangeMut<'_, K, V> {
     }
 }
 
-impl<K, V, O> BTreeMap<K, V, O> {
+impl<K, V> BTreeMap<K, V> {
     /// Makes a new, empty `BTreeMap` ordered by the given `order`.
     ///
     /// Does not allocate anything on its own.
@@ -1120,7 +1116,7 @@ impl<K, V, A: Allocator + Clone> BTreeMap<K, V, A> {
     /// ```
     pub fn append<C>(&mut self, other: &mut Self, mega_comp: C)
     where
-        C: FnMut(&(K, V), &(K, V)) -> Ordering,
+        C: Fn(&(K, V), &(K, V)) -> Ordering,
         A: Clone,
     {
         // Do we have to append anything at all?

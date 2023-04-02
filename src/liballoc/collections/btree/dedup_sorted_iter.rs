@@ -1,53 +1,51 @@
 use core::iter::Peekable;
 
-use crate::{SortableByWithOrder, TotalOrder};
-
 /// A iterator for deduping the key of a sorted iterator.
 /// When encountering the duplicated key, only the last key-value pair is yielded.
 ///
 /// Used by [`BTreeMap::bulk_build_from_sorted_iter`][1].
 ///
 /// [1]: crate::collections::BTreeMap::bulk_build_from_sorted_iter
-pub struct DedupSortedIter<'a, K, V, O, I>
-where
-    I: Iterator<Item = (K, V)>,
-{
-    iter: Peekable<I>,
-    order: &'a O,
-}
+struct DeleteMe;
 
-impl<'a, K, V, O, I> DedupSortedIter<'a, K, V, O, I>
-where
-    I: Iterator<Item = (K, V)>,
-{
-    pub fn new(iter: I, order: &'a O) -> Self {
-        Self { iter: iter.peekable(), order }
-    }
-}
+//todo consider turning me back on
+//pub struct DedupSortedIter<K, V, I>
+//where
+    //I: Iterator<Item = (K, V)>,
+//{
+    //iter: Peekable<I>,
+//}
 
-impl<K, V, O, I> Iterator for DedupSortedIter<'_, K, V, O, I>
-where
-    K: SortableByWithOrder<O>,
-    O: TotalOrder,
-    I: Iterator<Item = (K, V)>,
-{
-    type Item = (K, V);
+//impl<'a, K, V, I> DedupSortedIter<K, V, I>
+//where
+    //I: Iterator<Item = (K, V)>,
+//{
+    //pub fn new(iter: I) -> Self {
+        //Self { iter: iter.peekable() }
+    //}
+//}
 
-    fn next(&mut self) -> Option<(K, V)> {
-        loop {
-            let next = match self.iter.next() {
-                Some(next) => next,
-                None => return None,
-            };
+//impl<K, V, I> Iterator for DedupSortedIter<K, V, I>
+//where
+    //I: Iterator<Item = (K, V)>,
+//{
+    //type Item = (K, V);
 
-            let peeked = match self.iter.peek() {
-                Some(peeked) => peeked,
-                None => return Some(next),
-            };
+    //fn next(&mut self) -> Option<(K, V)> {
+        //loop {
+            //let next = match self.iter.next() {
+                //Some(next) => next,
+                //None => return None,
+            //};
 
-            if self.order.ne(&next.0, &peeked.0) {
-                return Some(next);
-            }
-        }
-    }
-}
+            //let peeked = match self.iter.peek() {
+                //Some(peeked) => peeked,
+                //None => return Some(next),
+            //};
+
+            //if self.order.ne(&next.0, &peeked.0) {
+                //return Some(next);
+            //}
+        //}
+    //}
+//}
