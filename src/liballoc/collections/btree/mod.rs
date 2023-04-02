@@ -9,7 +9,7 @@ mod navigate;
 mod node;
 mod remove;
 mod search;
-pub mod set;
+//pub mod set;
 mod set_val;
 mod split;
 
