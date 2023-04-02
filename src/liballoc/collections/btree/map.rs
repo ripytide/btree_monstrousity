@@ -9,11 +9,7 @@ use core::mem::{self, ManuallyDrop};
 use core::ops::{Bound, Deref, DerefMut, Index, RangeBounds};
 use core::ptr;
 
-use crate::{
-    default::{OrdStoredKey, OrdTotalOrder},
-    polyfill::*,
-    SortableBy, SortableByWithOrder, TotalOrder,
-};
+use crate::polyfill::*;
 
 use super::borrow::DormantMutRef;
 use super::dedup_sorted_iter::DedupSortedIter;
@@ -195,11 +191,7 @@ impl From<SearchBoundCustom> for SearchBound {
 /// player_stats.entry("mana").and_modify(|mana| *mana += 200).or_insert(100);
 /// ```
 #[cfg_attr(feature = "rustc_attrs", rustc_insignificant_dtor)]
-pub struct BTreeMap<
-    K,
-    V,
-    A: Allocator + Clone = Global,
-> {
+pub struct BTreeMap<K, V, A: Allocator + Clone = Global> {
     root: Option<Root<K, V>>,
     length: usize,
     /// `ManuallyDrop` to control drop order (needs to be dropped after all the nodes).
@@ -331,7 +323,7 @@ impl<K: Clone, V: Clone, O: Clone, A: Allocator + Clone> Clone for BTreeMap<K, V
 
 impl<K, C, A: Allocator + Clone> super::Recover<C> for BTreeMap<K, SetValZST, A>
 where
-        C: FnMut(&K) -> Ordering,
+    C: FnMut(&K) -> Ordering,
 {
     type Key = K;
 
@@ -619,13 +611,8 @@ impl<K, V, O> BTreeMap<K, V, O> {
     /// assert!(map.insert("abcdefghij".to_string(), ()).is_none());
     /// ```
     #[must_use]
-    pub const fn new(order: O) -> BTreeMap<K, V, O> {
-        BTreeMap {
-            root: None,
-            length: 0,
-            alloc: ManuallyDrop::new(Global),
-            _marker: PhantomData,
-        }
+    pub const fn new() -> BTreeMap<K, V> {
+        BTreeMap { root: None, length: 0, alloc: ManuallyDrop::new(Global), _marker: PhantomData }
     }
 }
 
@@ -644,8 +631,7 @@ impl<K, V, A: Allocator + Clone> BTreeMap<K, V, A> {
     /// a.clear();
     /// assert!(a.is_empty());
     /// ```
-    pub fn clear(&mut self)
-    {
+    pub fn clear(&mut self) {
         // avoid moving the allocator
         mem::drop(BTreeMap {
             root: mem::replace(&mut self.root, None),
@@ -1416,8 +1402,7 @@ impl<K, V, A: Allocator + Clone> BTreeMap<K, V, A> {
         }
     }
 
-    pub(super) fn drain_filter_inner(&mut self) -> (DrainFilterInner<'_, K, V>, A)
-    {
+    pub(super) fn drain_filter_inner(&mut self) -> (DrainFilterInner<'_, K, V>, A) {
         if let Some(root) = self.root.as_mut() {
             let (root, dormant_root) = DormantMutRef::new(root);
             let front = root.borrow_mut().first_leaf_edge();
@@ -1486,83 +1471,83 @@ impl<K, V, A: Allocator + Clone> BTreeMap<K, V, A> {
     //todo consider turning me back on
     // /// Makes a `BTreeMap` from a sorted iterator.
     //pub(crate) fn bulk_build_from_sorted_iter<I>(
-        //iter: I,
-        //order: O,
-        //alloc: A,
+    //iter: I,
+    //order: O,
+    //alloc: A,
     //) -> BTreeMap<K, V, A>
     //where
-        //K: SortableByWithOrder<O>,
-        //O: TotalOrder,
-        //I: IntoIterator<Item = (K, V)>,
+    //K: SortableByWithOrder<O>,
+    //O: TotalOrder,
+    //I: IntoIterator<Item = (K, V)>,
     //{
-        //let mut root = Root::new(alloc.clone());
-        //let mut length = 0;
-        //root.bulk_push(DedupSortedIter::new(iter.into_iter(), &order), &mut length, alloc.clone());
-        //BTreeMap {
-            //root: Some(root),
-            //length,
-            //order,
-            //alloc: ManuallyDrop::new(alloc),
-            //_marker: PhantomData,
-        //}
+    //let mut root = Root::new(alloc.clone());
+    //let mut length = 0;
+    //root.bulk_push(DedupSortedIter::new(iter.into_iter(), &order), &mut length, alloc.clone());
+    //BTreeMap {
+    //root: Some(root),
+    //length,
+    //order,
+    //alloc: ManuallyDrop::new(alloc),
+    //_marker: PhantomData,
+    //}
     //}
 
     //#[doc(hidden)]
     //pub fn get_order(&self) -> &O {
-        //&self.order
+    //&self.order
     //}
 
     //#[doc(hidden)]
     //pub fn get_mut_order(&mut self) -> OrderMut<'_, K, V, A>
     //where
-        //K: SortableByWithOrder<O>,
-        //O: TotalOrder,
+    //K: SortableByWithOrder<O>,
+    //O: TotalOrder,
     //{
-        //OrderMut(self)
+    //OrderMut(self)
     //}
 
     //#[doc(hidden)]
     //pub fn get_mut_order_unchecked(&mut self) -> &mut O {
-        //&mut self.order
+    //&mut self.order
     //}
 }
 
 //todo consider turning me back on
 //#[doc(hidden)]
 //pub struct OrderMut<'a, K: SortableByWithOrder<O>, V, O: TotalOrder, A: Allocator + Clone>(
-    //&'a mut BTreeMap<K, V, A>,
+//&'a mut BTreeMap<K, V, A>,
 //);
 
 //impl<K: SortableByWithOrder<O>, V, O: TotalOrder, A: Allocator + Clone> Deref
-    //for OrderMut<'_, K, V, A>
+//for OrderMut<'_, K, V, A>
 //{
-    //type Target = O;
-    //fn deref(&self) -> &Self::Target {
-        //&self.0.order
-    //}
+//type Target = O;
+//fn deref(&self) -> &Self::Target {
+//&self.0.order
+//}
 //}
 
 //impl<K: SortableByWithOrder<O>, V, O: TotalOrder, A: Allocator + Clone> DerefMut
-    //for OrderMut<'_, K, V, A>
+//for OrderMut<'_, K, V, A>
 //{
-    //fn deref_mut(&mut self) -> &mut Self::Target {
-        //&mut self.0.order
-    //}
+//fn deref_mut(&mut self) -> &mut Self::Target {
+//&mut self.0.order
+//}
 //}
 
 //impl<K: SortableByWithOrder<O>, V, O: TotalOrder, A: Allocator + Clone> Drop
-    //for OrderMut<'_, K, V, A>
+//for OrderMut<'_, K, V, A>
 //{
-    //fn drop(&mut self) {
-        //// FIXME: perform a safe, in-place sort
-        //unsafe {
-            //let casted = &mut *(self.0 as *mut _ as *mut BTreeMap<K, V, ManuallyDrop<O>, A>);
-            //let order = ManuallyDrop::take(&mut casted.order);
-            //let alloc = ManuallyDrop::take(&mut casted.alloc);
-            //let original = mem::replace(casted, BTreeMap::new_in(alloc));
-            //self.0.extend(original);
-        //}
-    //}
+//fn drop(&mut self) {
+//// FIXME: perform a safe, in-place sort
+//unsafe {
+//let casted = &mut *(self.0 as *mut _ as *mut BTreeMap<K, V, ManuallyDrop<O>, A>);
+//let order = ManuallyDrop::take(&mut casted.order);
+//let alloc = ManuallyDrop::take(&mut casted.alloc);
+//let original = mem::replace(casted, BTreeMap::new_in(alloc));
+//self.0.extend(original);
+//}
+//}
 //}
 
 impl<'a, K, V, A: Allocator + Clone> IntoIterator for &'a BTreeMap<K, V, A> {
@@ -2149,52 +2134,52 @@ impl<K, V> FusedIterator for RangeMut<'_, K, V> {}
 
 //todo consider turning me back on
 //impl<K: SortableByWithOrder<O>, V, O: TotalOrder + Default> FromIterator<(K, V)>
-    //for BTreeMap<K, V, O>
+//for BTreeMap<K, V, O>
 //{
-    //fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> BTreeMap<K, V, O> {
-        //let mut inputs: Vec<_> = iter.into_iter().collect();
+//fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> BTreeMap<K, V, O> {
+//let mut inputs: Vec<_> = iter.into_iter().collect();
 
-        //if inputs.is_empty() {
-            //return BTreeMap::new(O::default());
-        //}
+//if inputs.is_empty() {
+//return BTreeMap::new(O::default());
+//}
 
-        //// use stable sort to preserve the insertion order.
-        //let order = O::default();
-        //inputs.sort_by(|a, b| order.cmp_any(&a.0, &b.0));
-        //BTreeMap::bulk_build_from_sorted_iter(inputs, order, Global)
-    //}
+//// use stable sort to preserve the insertion order.
+//let order = O::default();
+//inputs.sort_by(|a, b| order.cmp_any(&a.0, &b.0));
+//BTreeMap::bulk_build_from_sorted_iter(inputs, order, Global)
+//}
 //}
 
 //todo consider turning me back on
 //impl<K: SortableByWithOrder<O>, V, O: TotalOrder, A: Allocator + Clone> Extend<(K, V)>
-    //for BTreeMap<K, V, A>
+//for BTreeMap<K, V, A>
 //{
-    //#[inline]
-    //fn extend<T: IntoIterator<Item = (K, V)>>(&mut self, iter: T) {
-        //iter.into_iter().for_each(move |(k, v)| {
-            //self.insert(k, v, comp);
-        //});
-    //}
+//#[inline]
+//fn extend<T: IntoIterator<Item = (K, V)>>(&mut self, iter: T) {
+//iter.into_iter().for_each(move |(k, v)| {
+//self.insert(k, v, comp);
+//});
+//}
 
-    //#[inline]
-    //#[cfg(feature = "extend_one")]
-    //fn extend_one(&mut self, (k, v): (K, V)) {
-        //self.insert(k, v);
-    //}
+//#[inline]
+//#[cfg(feature = "extend_one")]
+//fn extend_one(&mut self, (k, v): (K, V)) {
+//self.insert(k, v);
+//}
 //}
 
 //impl<'a, K: SortableByWithOrder<O> + Copy, V: Copy, O: TotalOrder, A: Allocator + Clone>
-    //Extend<(&'a K, &'a V)> for BTreeMap<K, V, A>
+//Extend<(&'a K, &'a V)> for BTreeMap<K, V, A>
 //{
-    //fn extend<I: IntoIterator<Item = (&'a K, &'a V)>>(&mut self, iter: I) {
-        //self.extend(iter.into_iter().map(|(&key, &value)| (key, value)));
-    //}
+//fn extend<I: IntoIterator<Item = (&'a K, &'a V)>>(&mut self, iter: I) {
+//self.extend(iter.into_iter().map(|(&key, &value)| (key, value)));
+//}
 
-    //#[inline]
-    //#[cfg(feature = "extend_one")]
-    //fn extend_one(&mut self, (&k, &v): (&'a K, &'a V)) {
-        //self.insert(k, v);
-    //}
+//#[inline]
+//#[cfg(feature = "extend_one")]
+//fn extend_one(&mut self, (&k, &v): (&'a K, &'a V)) {
+//self.insert(k, v);
+//}
 //}
 
 impl<K: Hash, V: Hash, A: Allocator + Clone> Hash for BTreeMap<K, V, A> {
@@ -2206,10 +2191,10 @@ impl<K: Hash, V: Hash, A: Allocator + Clone> Hash for BTreeMap<K, V, A> {
     }
 }
 
-impl<K, V, O: TotalOrder + Default> Default for BTreeMap<K, V, O> {
+impl<K, V> Default for BTreeMap<K, V> {
     /// Creates an empty `BTreeMap`, ordered by a default `O` order.
-    fn default() -> BTreeMap<K, V, O> {
-        BTreeMap::new(O::default())
+    fn default() -> BTreeMap<K, V> {
+        BTreeMap::new()
     }
 }
 
@@ -2244,46 +2229,47 @@ impl<K: Debug, V: Debug, A: Allocator + Clone> Debug for BTreeMap<K, V, A> {
 //todo consider turning me back on
 //impl<K, Q: ?Sized, V, A: Allocator + Clone> Index<&Q> for BTreeMap<K, V, A>
 //where
-    //K: SortableByWithOrder<O>,
-    //Q: SortableByWithOrder<O>,
-    //O: TotalOrder,
+//K: SortableByWithOrder<O>,
+//Q: SortableByWithOrder<O>,
+//O: TotalOrder,
 //{
-    //type Output = V;
+//type Output = V;
 
-    ///// Returns a reference to the value corresponding to the supplied key.
-    /////
-    ///// # Panics
-    /////
-    ///// Panics if the key is not present in the `BTreeMap`.
-    //#[inline]
-    //fn index(&self, key: &Q) -> &V {
-        //self.get(key).expect("no entry found for key")
-    //}
+///// Returns a reference to the value corresponding to the supplied key.
+/////
+///// # Panics
+/////
+///// Panics if the key is not present in the `BTreeMap`.
+//#[inline]
+//fn index(&self, key: &Q) -> &V {
+//self.get(key).expect("no entry found for key")
+//}
 //}
 
-impl<K: SortableByWithOrder<O>, V, O: TotalOrder + Default, const N: usize> From<[(K, V); N]>
-    for BTreeMap<K, V, O>
-{
-    /// Converts a `[(K, V); N]` into a `BTreeMap<(K, V)>`.
-    ///
-    /// ```
-    /// use copse::BTreeMap;
-    ///
-    /// let map1 = BTreeMap::from([(1, 2), (3, 4)]);
-    /// let map2: BTreeMap<_, _> = [(1, 2), (3, 4)].into();
-    /// assert_eq!(map1, map2);
-    /// ```
-    fn from(mut arr: [(K, V); N]) -> Self {
-        if N == 0 {
-            return BTreeMap::new(O::default());
-        }
+//todo consider turning me back on
+//impl<K, V, const N: usize> From<[(K, V); N]>
+    //for BTreeMap<K, V>
+//{
+    ///// Converts a `[(K, V); N]` into a `BTreeMap<(K, V)>`.
+    /////
+    ///// ```
+    ///// use copse::BTreeMap;
+    /////
+    ///// let map1 = BTreeMap::from([(1, 2), (3, 4)]);
+    ///// let map2: BTreeMap<_, _> = [(1, 2), (3, 4)].into();
+    ///// assert_eq!(map1, map2);
+    ///// ```
+    //fn from(mut arr: [(K, V); N]) -> Self {
+        //if N == 0 {
+            //return BTreeMap::new();
+        //}
 
-        // use stable sort to preserve the insertion order.
-        let order = O::default();
-        arr.sort_by(|a, b| order.cmp_any(&a.0, &b.0));
-        BTreeMap::bulk_build_from_sorted_iter(arr, order, Global)
-    }
-}
+        //// use stable sort to preserve the insertion order.
+        //let order = O::default();
+        //arr.sort_by(|a, b| order.cmp_any(&a.0, &b.0));
+        //BTreeMap::bulk_build_from_sorted_iter(arr, order, Global)
+    //}
+//}
 
 impl<K, V, A: Allocator + Clone> BTreeMap<K, V, A> {
     /// Gets an iterator over the entries of the map, sorted by key.
