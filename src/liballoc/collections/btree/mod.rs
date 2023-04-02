@@ -14,10 +14,10 @@ mod set_val;
 mod split;
 
 #[doc(hidden)]
-trait Recover<Q: ?Sized> {
+trait Recover<C> {
     type Key;
 
-    fn get(&self, key: &Q) -> Option<&Self::Key>;
-    fn take(&mut self, key: &Q) -> Option<Self::Key>;
-    fn replace(&mut self, key: Self::Key) -> Option<Self::Key>;
+    fn get(&self, comp: C) -> Option<&Self::Key>;
+    fn take(&mut self, comp: C) -> Option<Self::Key>;
+    fn replace(&mut self, key: Self::Key, comp: C) -> Option<Self::Key>;
 }

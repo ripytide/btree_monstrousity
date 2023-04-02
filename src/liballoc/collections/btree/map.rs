@@ -321,7 +321,7 @@ impl<K: Clone, V: Clone, O: Clone, A: Allocator + Clone> Clone for BTreeMap<K, V
         }
 
         if self.is_empty() {
-            BTreeMap::new_in(self.order.clone(), (*self.alloc).clone())
+            BTreeMap::new_in((*self.alloc).clone())
         } else {
             clone_subtree(
                 self.root.as_ref().unwrap().reborrow(),
@@ -332,26 +332,24 @@ impl<K: Clone, V: Clone, O: Clone, A: Allocator + Clone> Clone for BTreeMap<K, V
     }
 }
 
-impl<K, Q: ?Sized, O, A: Allocator + Clone> super::Recover<Q> for BTreeMap<K, SetValZST, O, A>
+impl<K, C, O, A: Allocator + Clone> super::Recover<C> for BTreeMap<K, SetValZST, O, A>
 where
-    K: SortableByWithOrder<O>,
-    Q: SortableByWithOrder<O>,
-    O: TotalOrder,
+        C: FnMut(&K) -> Ordering,
 {
     type Key = K;
 
-    fn get(&self, key: &Q) -> Option<&K> {
+    fn get(&self, comp: C) -> Option<&K> {
         let root_node = self.root.as_ref()?.reborrow();
-        match root_node.search_tree(key, &self.order) {
+        match root_node.search_tree(comp) {
             Found(handle) => Some(handle.into_kv().0),
             GoDown(_) => None,
         }
     }
 
-    fn take(&mut self, key: &Q) -> Option<K> {
+    fn take(&mut self, comp: C) -> Option<K> {
         let (map, dormant_map) = DormantMutRef::new(self);
         let root_node = map.root.as_mut()?.borrow_mut();
-        match root_node.search_tree(key, &map.order) {
+        match root_node.search_tree(comp) {
             Found(handle) => Some(
                 OccupiedEntry {
                     handle,
@@ -366,11 +364,11 @@ where
         }
     }
 
-    fn replace(&mut self, key: K) -> Option<K> {
+    fn replace(&mut self, key: K, comp: C) -> Option<K> {
         let (map, dormant_map) = DormantMutRef::new(self);
         let root_node =
             map.root.get_or_insert_with(|| Root::new((*map.alloc).clone())).borrow_mut();
-        match root_node.search_tree(&key, &map.order) {
+        match root_node.search_tree(comp) {
             Found(mut kv) => Some(mem::replace(kv.key_mut(), key)),
             GoDown(handle) => {
                 VacantEntry {
@@ -979,12 +977,11 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
     /// assert_eq!(map.insert(37, "c"), Some("b"));
     /// assert_eq!(map[&37], "c");
     /// ```
-    pub fn insert(&mut self, key: K, value: V) -> Option<V>
+    pub fn insert<C>(&mut self, key: K, value: V, comp: C) -> Option<V>
     where
-        K: SortableByWithOrder<O>,
-        O: TotalOrder,
+        C: FnMut(&K) -> Ordering,
     {
-        match self.entry(key) {
+        match self.entry(key, comp) {
             Occupied(mut entry) => Some(entry.insert(value)),
             Vacant(entry) => {
                 entry.insert(value);
@@ -2174,36 +2171,37 @@ impl<K: SortableByWithOrder<O>, V, O: TotalOrder + Default> FromIterator<(K, V)>
     }
 }
 
-impl<K: SortableByWithOrder<O>, V, O: TotalOrder, A: Allocator + Clone> Extend<(K, V)>
-    for BTreeMap<K, V, O, A>
-{
-    #[inline]
-    fn extend<T: IntoIterator<Item = (K, V)>>(&mut self, iter: T) {
-        iter.into_iter().for_each(move |(k, v)| {
-            self.insert(k, v);
-        });
-    }
+//todo consider turning me back on
+//impl<K: SortableByWithOrder<O>, V, O: TotalOrder, A: Allocator + Clone> Extend<(K, V)>
+    //for BTreeMap<K, V, O, A>
+//{
+    //#[inline]
+    //fn extend<T: IntoIterator<Item = (K, V)>>(&mut self, iter: T) {
+        //iter.into_iter().for_each(move |(k, v)| {
+            //self.insert(k, v, comp);
+        //});
+    //}
 
-    #[inline]
-    #[cfg(feature = "extend_one")]
-    fn extend_one(&mut self, (k, v): (K, V)) {
-        self.insert(k, v);
-    }
-}
+    //#[inline]
+    //#[cfg(feature = "extend_one")]
+    //fn extend_one(&mut self, (k, v): (K, V)) {
+        //self.insert(k, v);
+    //}
+//}
 
-impl<'a, K: SortableByWithOrder<O> + Copy, V: Copy, O: TotalOrder, A: Allocator + Clone>
-    Extend<(&'a K, &'a V)> for BTreeMap<K, V, O, A>
-{
-    fn extend<I: IntoIterator<Item = (&'a K, &'a V)>>(&mut self, iter: I) {
-        self.extend(iter.into_iter().map(|(&key, &value)| (key, value)));
-    }
+//impl<'a, K: SortableByWithOrder<O> + Copy, V: Copy, O: TotalOrder, A: Allocator + Clone>
+    //Extend<(&'a K, &'a V)> for BTreeMap<K, V, O, A>
+//{
+    //fn extend<I: IntoIterator<Item = (&'a K, &'a V)>>(&mut self, iter: I) {
+        //self.extend(iter.into_iter().map(|(&key, &value)| (key, value)));
+    //}
 
-    #[inline]
-    #[cfg(feature = "extend_one")]
-    fn extend_one(&mut self, (&k, &v): (&'a K, &'a V)) {
-        self.insert(k, v);
-    }
-}
+    //#[inline]
+    //#[cfg(feature = "extend_one")]
+    //fn extend_one(&mut self, (&k, &v): (&'a K, &'a V)) {
+        //self.insert(k, v);
+    //}
+//}
 
 impl<K: Hash, V: Hash, O, A: Allocator + Clone> Hash for BTreeMap<K, V, O, A> {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -2249,24 +2247,25 @@ impl<K: Debug, V: Debug, O, A: Allocator + Clone> Debug for BTreeMap<K, V, O, A>
     }
 }
 
-impl<K, Q: ?Sized, V, O, A: Allocator + Clone> Index<&Q> for BTreeMap<K, V, O, A>
-where
-    K: SortableByWithOrder<O>,
-    Q: SortableByWithOrder<O>,
-    O: TotalOrder,
-{
-    type Output = V;
+//todo consider turning me back on
+//impl<K, Q: ?Sized, V, O, A: Allocator + Clone> Index<&Q> for BTreeMap<K, V, O, A>
+//where
+    //K: SortableByWithOrder<O>,
+    //Q: SortableByWithOrder<O>,
+    //O: TotalOrder,
+//{
+    //type Output = V;
 
-    /// Returns a reference to the value corresponding to the supplied key.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the key is not present in the `BTreeMap`.
-    #[inline]
-    fn index(&self, key: &Q) -> &V {
-        self.get(key).expect("no entry found for key")
-    }
-}
+    ///// Returns a reference to the value corresponding to the supplied key.
+    /////
+    ///// # Panics
+    /////
+    ///// Panics if the key is not present in the `BTreeMap`.
+    //#[inline]
+    //fn index(&self, key: &Q) -> &V {
+        //self.get(key).expect("no entry found for key")
+    //}
+//}
 
 impl<K: SortableByWithOrder<O>, V, O: TotalOrder + Default, const N: usize> From<[(K, V); N]>
     for BTreeMap<K, V, O>
