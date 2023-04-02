@@ -47,13 +47,13 @@ impl<BorrowType: marker::BorrowType, K, V> NodeRef<BorrowType, K, V, marker::Lea
     /// in a `BTreeMap` is.
     pub fn search_tree<C>(
         mut self,
-        comp: C,
+        mut comp: C,
     ) -> SearchResult<BorrowType, K, V, marker::LeafOrInternal, marker::Leaf>
     where
         C: FnMut(&K) -> Ordering,
     {
         loop {
-            self = match self.search_node(comp) {
+            self = match self.search_node(&mut comp) {
                 Found(handle) => return Found(handle),
                 GoDown(handle) => match handle.force() {
                     Leaf(leaf) => return GoDown(leaf),
@@ -80,9 +80,9 @@ impl<BorrowType: marker::BorrowType, K, V> NodeRef<BorrowType, K, V, marker::Lea
     /// The result is meaningful only if the tree is ordered by key.
     pub fn search_tree_for_bifurcation<C1, C2>(
         mut self,
-        lower_comp: C1,
+        mut lower_comp: C1,
         mut lower_bound: SearchBound,
-        upper_comp: C2,
+        mut upper_comp: C2,
         mut upper_bound: SearchBound,
     ) -> Result<
         (NodeRef<BorrowType, K, V, marker::LeafOrInternal>, usize, usize, SearchBound, SearchBound),
@@ -98,9 +98,9 @@ impl<BorrowType: marker::BorrowType, K, V> NodeRef<BorrowType, K, V, marker::Lea
 
         loop {
             let (lower_edge_idx, lower_child_bound) =
-                self.find_lower_bound_index(lower_comp, lower_bound);
+                self.find_lower_bound_index(&mut lower_comp, lower_bound);
             let (upper_edge_idx, upper_child_bound) =
-                unsafe { self.find_upper_bound_index(upper_comp, upper_bound, lower_edge_idx) };
+                unsafe { self.find_upper_bound_index(&mut upper_comp, upper_bound, lower_edge_idx) };
             if lower_edge_idx < upper_edge_idx {
                 return Ok((
                     self,

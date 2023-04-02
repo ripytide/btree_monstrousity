@@ -32,7 +32,7 @@ impl<K, V> Root<K, V> {
     /// `self` and the returned tree will respect those invariants.
     pub fn split_off<C, A: Allocator + Clone>(
         &mut self,
-        comp: C,
+        mut comp: C,
         alloc: A,
     ) -> Self
     where
@@ -44,7 +44,7 @@ impl<K, V> Root<K, V> {
         let mut right_node = right_root.borrow_mut();
 
         loop {
-            let mut split_edge = match left_node.search_node(comp) {
+            let mut split_edge = match left_node.search_node(&mut comp) {
                 // key is going to the right tree
                 Found(kv) => kv.left_edge(),
                 GoDown(edge) => edge,

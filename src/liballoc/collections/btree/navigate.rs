@@ -252,16 +252,16 @@ impl<BorrowType: marker::BorrowType, K, V> NodeRef<BorrowType, K, V, marker::Lea
     /// KV twice.
     unsafe fn find_leaf_edges_spanning_range<C1, C2>(
         self,
-        lower_comp: C1,
+        mut lower_comp: C1,
         lower_bound: SearchBound,
-        upper_comp: C2,
+        mut upper_comp: C2,
         upper_bound: SearchBound,
     ) -> LeafRange<BorrowType, K, V>
     where
         C1: FnMut(&K) -> Ordering,
         C2: FnMut(&K) -> Ordering,
     {
-        match self.search_tree_for_bifurcation(lower_comp, lower_bound, upper_comp, upper_bound) {
+        match self.search_tree_for_bifurcation(&mut lower_comp, lower_bound, &mut upper_comp, upper_bound) {
             Err(_) => LeafRange::none(),
             Ok((
                 node,
@@ -277,9 +277,9 @@ impl<BorrowType: marker::BorrowType, K, V> NodeRef<BorrowType, K, V, marker::Lea
                         (Leaf(f), Leaf(b)) => return LeafRange { front: Some(f), back: Some(b) },
                         (Internal(f), Internal(b)) => {
                             (lower_edge, lower_child_bound) =
-                                f.descend().find_lower_bound_edge(lower_comp, lower_child_bound);
+                                f.descend().find_lower_bound_edge(&mut lower_comp, lower_child_bound);
                             (upper_edge, upper_child_bound) =
-                                b.descend().find_upper_bound_edge(upper_comp, upper_child_bound);
+                                b.descend().find_upper_bound_edge(&mut upper_comp, upper_child_bound);
                         }
                         _ => unreachable!("BTreeMap has different depths"),
                     }
