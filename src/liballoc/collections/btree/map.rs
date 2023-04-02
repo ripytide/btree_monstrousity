@@ -951,11 +951,11 @@ impl<K, V, A: Allocator + Clone> BTreeMap<K, V, A> {
     /// assert_eq!(map.insert(37, "c"), Some("b"));
     /// assert_eq!(map[&37], "c");
     /// ```
-    pub fn insert<C>(&mut self, key: K, value: V, comp: C) -> Option<V>
+    pub fn insert<C>(&mut self, key: K, value: V, double_comp: C) -> Option<V>
     where
-        C: FnMut(&K) -> Ordering,
+        C: FnMut(&K, &K) -> Ordering,
     {
-        match self.entry(key, comp) {
+        match self.entry(key, double_comp) {
             Occupied(mut entry) => Some(entry.insert(value)),
             Vacant(entry) => {
                 entry.insert(value);
@@ -1270,9 +1270,9 @@ impl<K, V, A: Allocator + Clone> BTreeMap<K, V, A> {
     /// assert_eq!(count["b"], 2);
     /// assert_eq!(count["c"], 1);
     /// ```
-    pub fn entry<C>(&mut self, key: K, comp: C) -> Entry<'_, K, V, A>
+    pub fn entry<C>(&mut self, key: K, mut double_comp: C) -> Entry<'_, K, V, A>
     where
-        C: FnMut(&K) -> Ordering,
+        C: FnMut(&K, &K) -> Ordering,
     {
         let (map, dormant_map) = DormantMutRef::new(self);
         match map.root {
@@ -1283,7 +1283,7 @@ impl<K, V, A: Allocator + Clone> BTreeMap<K, V, A> {
                 alloc: (*map.alloc).clone(),
                 _marker: PhantomData,
             }),
-            Some(ref mut root) => match root.borrow_mut().search_tree(comp) {
+            Some(ref mut root) => match root.borrow_mut().search_tree(|k| double_comp(k, &key)) {
                 Found(handle) => Occupied(OccupiedEntry {
                     handle,
                     dormant_map,
