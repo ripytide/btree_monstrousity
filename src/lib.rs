@@ -32,6 +32,7 @@ use core::cmp::Ordering;
 #[macro_use]
 mod polyfill;
 pub mod default;
+pub mod ripytide;
 
 // port of stdlib implementation
 mod liballoc;
