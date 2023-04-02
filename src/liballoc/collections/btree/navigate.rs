@@ -1,4 +1,5 @@
 use crate::{SortableByWithOrder, TotalOrder};
+use core::cmp::Ordering;
 use core::hint;
 use core::ops::RangeBounds;
 use core::ptr;
@@ -250,18 +251,18 @@ impl<BorrowType: marker::BorrowType, K, V> NodeRef<BorrowType, K, V, marker::Lea
     /// # Safety
     /// Unless `BorrowType` is `Immut`, do not use the handles to visit the same
     /// KV twice.
-    unsafe fn find_leaf_edges_spanning_range<Q: ?Sized, R, O>(
+    unsafe fn find_leaf_edges_spanning_range<C1, C2>(
         self,
-        order: &O,
-        range: R,
+        lower_comp: C1,
+        lower_bound: SearchBound,
+        upper_comp: C2,
+        upper_bound: SearchBound,
     ) -> LeafRange<BorrowType, K, V>
     where
-        K: SortableByWithOrder<O>,
-        Q: SortableByWithOrder<O>,
-        R: RangeBounds<Q>,
-        O: TotalOrder,
+        C1: FnMut(&K) -> Ordering,
+        C2: FnMut(&K) -> Ordering,
     {
-        match self.search_tree_for_bifurcation(order, &range) {
+        match self.search_tree_for_bifurcation(lower_comp, lower_bound, upper_comp, upper_bound) {
             Err(_) => LeafRange::none(),
             Ok((
                 node,
@@ -277,9 +278,9 @@ impl<BorrowType: marker::BorrowType, K, V> NodeRef<BorrowType, K, V, marker::Lea
                         (Leaf(f), Leaf(b)) => return LeafRange { front: Some(f), back: Some(b) },
                         (Internal(f), Internal(b)) => {
                             (lower_edge, lower_child_bound) =
-                                f.descend().find_lower_bound_edge(order, lower_child_bound);
+                                f.descend().find_lower_bound_edge(lower_comp, lower_child_bound);
                             (upper_edge, upper_child_bound) =
-                                b.descend().find_upper_bound_edge(order, upper_child_bound);
+                                b.descend().find_upper_bound_edge(upper_comp, upper_child_bound);
                         }
                         _ => unreachable!("BTreeMap has different depths"),
                     }
@@ -304,15 +305,21 @@ impl<'a, K: 'a, V: 'a> NodeRef<marker::Immut<'a>, K, V, marker::LeafOrInternal> 
     ///
     /// The result is meaningful only if the tree is ordered by key, like the tree
     /// in a `BTreeMap` is.
-    pub fn range_search<Q, R, O>(self, order: &O, range: R) -> LeafRange<marker::Immut<'a>, K, V>
+    pub fn range_search<C1, C2>(
+        self,
+        lower_comp: C1,
+        lower_bound: SearchBound,
+        upper_comp: C2,
+        upper_bound: SearchBound,
+    ) -> LeafRange<marker::Immut<'a>, K, V>
     where
-        K: SortableByWithOrder<O>,
-        Q: ?Sized + SortableByWithOrder<O>,
-        R: RangeBounds<Q>,
-        O: TotalOrder,
+        C1: FnMut(&K) -> Ordering,
+        C2: FnMut(&K) -> Ordering,
     {
         // SAFETY: our borrow type is immutable.
-        unsafe { self.find_leaf_edges_spanning_range(order, range) }
+        unsafe {
+            self.find_leaf_edges_spanning_range(lower_comp, lower_bound, upper_comp, upper_bound)
+        }
     }
 
     /// Finds the pair of leaf edges delimiting an entire tree.
@@ -331,14 +338,20 @@ impl<'a, K: 'a, V: 'a> NodeRef<marker::ValMut<'a>, K, V, marker::LeafOrInternal>
     ///
     /// # Safety
     /// Do not use the duplicate handles to visit the same KV twice.
-    pub fn range_search<Q, R, O>(self, order: &O, range: R) -> LeafRange<marker::ValMut<'a>, K, V>
+    pub fn range_search<C1, C2>(
+        self,
+        lower_comp: C1,
+        lower_bound: SearchBound,
+        upper_comp: C2,
+        upper_bound: SearchBound,
+    ) -> LeafRange<marker::ValMut<'a>, K, V>
     where
-        K: SortableByWithOrder<O>,
-        Q: ?Sized + SortableByWithOrder<O>,
-        R: RangeBounds<Q>,
-        O: TotalOrder,
+        C1: FnMut(&K) -> Ordering,
+        C2: FnMut(&K) -> Ordering,
     {
-        unsafe { self.find_leaf_edges_spanning_range(order, range) }
+        unsafe {
+            self.find_leaf_edges_spanning_range(lower_comp, lower_bound, upper_comp, upper_bound)
+        }
     }
 
     /// Splits a unique reference into a pair of leaf edges delimiting the full range of the tree.

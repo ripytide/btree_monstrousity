@@ -82,9 +82,9 @@ impl<BorrowType: marker::BorrowType, K, V> NodeRef<BorrowType, K, V, marker::Lea
     pub fn search_tree_for_bifurcation<C1, C2>(
         mut self,
         lower_comp: C1,
-        lower_bound: C2,
-        upper_comp: SearchBound,
-        upper_bound: SearchBound,
+        mut lower_bound: SearchBound,
+        upper_comp: C2,
+        mut upper_bound: SearchBound,
     ) -> Result<
         (NodeRef<BorrowType, K, V, marker::LeafOrInternal>, usize, usize, SearchBound, SearchBound),
         Handle<NodeRef<BorrowType, K, V, marker::Leaf>, marker::Edge>,
