@@ -1,11 +1,11 @@
 [package]
-name = "copse"
-version = "0.4.1"
+name = "btreemap_monstousity"
+version = "0.0.1"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/eggyal/copse.git"
-description = "Direct ports of the standard library's BTreeMap, BTreeSet and BinaryHeap collections, but that sort according to a specified total order rather than the `Ord` trait"
+repository = "https://github.com/ripytide/btree_monstrousity"
+description = "a code port of BTreeMap but with comparator functions"
 edition = "2021"
-keywords = ["b-tree", "collections", "binary-heap", "runtime"]
+keywords = ["b-tree", "collections"]
 categories = ["data-structures", "no-std"]
 
 [features]
