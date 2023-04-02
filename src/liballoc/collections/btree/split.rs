@@ -1,3 +1,5 @@
+use core::cmp::Ordering;
+
 use super::node::{ForceResult::*, Root};
 use super::search::SearchResult::*;
 use crate::polyfill::*;
@@ -29,16 +31,13 @@ impl<K, V> Root<K, V> {
     /// and if the ordering of `Q` corresponds to that of `K`.
     /// If `self` respects all `BTreeMap` tree invariants, then both
     /// `self` and the returned tree will respect those invariants.
-    pub fn split_off<Q: ?Sized, A: Allocator + Clone, O>(
+    pub fn split_off<C, A: Allocator + Clone>(
         &mut self,
-        key: &Q,
-        order: &O,
+        comp: C,
         alloc: A,
     ) -> Self
     where
-        K: SortableByWithOrder<O>,
-        Q: SortableByWithOrder<O>,
-        O: TotalOrder,
+        C: FnMut(&K) -> Ordering,
     {
         let left_root = self;
         let mut right_root = Root::new_pillar(left_root.height(), alloc.clone());

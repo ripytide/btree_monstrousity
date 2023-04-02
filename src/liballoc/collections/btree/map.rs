@@ -34,6 +34,28 @@ use Entry::*;
 /// We might temporarily have fewer elements during methods.
 pub(super) const MIN_LEN: usize = node::MIN_LEN_AFTER_SPLIT;
 
+/// ripytide's bodge
+pub enum SearchBoundCustom {
+    /// An inclusive bound to look for, just like `Bound::Included(T)`.
+    Included,
+    /// An exclusive bound to look for, just like `Bound::Excluded(T)`.
+    Excluded,
+    /// An unconditional inclusive bound, just like `Bound::Unbounded`.
+    AllIncluded,
+    /// An unconditional exclusive bound.
+    AllExcluded,
+}
+impl From<SearchBoundCustom> for SearchBound {
+    fn from(bound_custom: SearchBoundCustom) -> Self {
+        match bound_custom {
+            SearchBoundCustom::Included => SearchBound::Included,
+            SearchBoundCustom::Excluded => SearchBound::Excluded,
+            SearchBoundCustom::AllIncluded => SearchBound::AllIncluded,
+            SearchBoundCustom::AllExcluded => SearchBound::AllExcluded,
+        }
+    }
+}
+
 // A tree in a `BTreeMap` is a tree in the `node` module with additional invariants:
 // - Keys must appear in ascending order (according to the key's type).
 // - Every non-leaf node contains at least 1 element (has at least 2 children).
@@ -181,6 +203,7 @@ pub struct BTreeMap<
 > {
     root: Option<Root<K, V>>,
     length: usize,
+    //todo delete me
     pub(super) order: O,
     /// `ManuallyDrop` to control drop order (needs to be dropped after all the nodes).
     pub(super) alloc: ManuallyDrop<A>,
@@ -661,7 +684,7 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
             /// ```
             pub
         }
-        fn new_in(order: O, alloc: A) -> BTreeMap<K, V, O, A> {
+        fn new_in(alloc: A) -> BTreeMap<K, V, O, A> {
             BTreeMap {
                 root: None,
                 length: 0,
@@ -691,14 +714,12 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
     /// assert_eq!(map.get(&1), Some(&"a"));
     /// assert_eq!(map.get(&2), None);
     /// ```
-    pub fn get<Q: ?Sized>(&self, key: &Q) -> Option<&V>
+    pub fn get<C>(&self, comp: C) -> Option<&V>
     where
-        K: SortableByWithOrder<O>,
-        Q: SortableByWithOrder<O>,
-        O: TotalOrder,
+        C: FnMut(&K) -> Ordering,
     {
         let root_node = self.root.as_ref()?.reborrow();
-        match root_node.search_tree(key, &self.order) {
+        match root_node.search_tree(comp) {
             Found(handle) => Some(handle.into_kv().1),
             GoDown(_) => None,
         }
@@ -719,14 +740,12 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
     /// assert_eq!(map.get_key_value(&1), Some((&1, &"a")));
     /// assert_eq!(map.get_key_value(&2), None);
     /// ```
-    pub fn get_key_value<Q: ?Sized>(&self, k: &Q) -> Option<(&K, &V)>
+    pub fn get_key_value<C>(&self, comp: C) -> Option<(&K, &V)>
     where
-        K: SortableByWithOrder<O>,
-        Q: SortableByWithOrder<O>,
-        O: TotalOrder,
+        C: FnMut(&K) -> Ordering,
     {
         let root_node = self.root.as_ref()?.reborrow();
-        match root_node.search_tree(k, &self.order) {
+        match root_node.search_tree(comp) {
             Found(handle) => Some(handle.into_kv()),
             GoDown(_) => None,
         }
@@ -748,11 +767,7 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
     /// map.insert(2, "a");
     /// assert_eq!(map.first_key_value(), Some((&1, &"b")));
     /// ```
-    pub fn first_key_value(&self) -> Option<(&K, &V)>
-    where
-        K: SortableByWithOrder<O>,
-        O: TotalOrder,
-    {
+    pub fn first_key_value(&self) -> Option<(&K, &V)> {
         let root_node = self.root.as_ref()?.reborrow();
         root_node.first_leaf_edge().right_kv().ok().map(Handle::into_kv)
     }
@@ -776,11 +791,7 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
     /// assert_eq!(*map.get(&1).unwrap(), "first");
     /// assert_eq!(*map.get(&2).unwrap(), "b");
     /// ```
-    pub fn first_entry(&mut self) -> Option<OccupiedEntry<'_, K, V, O, A>>
-    where
-        K: SortableByWithOrder<O>,
-        O: TotalOrder,
-    {
+    pub fn first_entry(&mut self) -> Option<OccupiedEntry<'_, K, V, O, A>> {
         let (map, dormant_map) = DormantMutRef::new(self);
         let root_node = map.root.as_mut()?.borrow_mut();
         let kv = root_node.first_leaf_edge().right_kv().ok()?;
@@ -810,11 +821,7 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
     /// }
     /// assert!(map.is_empty());
     /// ```
-    pub fn pop_first(&mut self) -> Option<(K, V)>
-    where
-        K: SortableByWithOrder<O>,
-        O: TotalOrder,
-    {
+    pub fn pop_first(&mut self) -> Option<(K, V)> {
         self.first_entry().map(|entry| entry.remove_entry())
     }
 
@@ -833,11 +840,7 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
     /// map.insert(2, "a");
     /// assert_eq!(map.last_key_value(), Some((&2, &"a")));
     /// ```
-    pub fn last_key_value(&self) -> Option<(&K, &V)>
-    where
-        K: SortableByWithOrder<O>,
-        O: TotalOrder,
-    {
+    pub fn last_key_value(&self) -> Option<(&K, &V)> {
         let root_node = self.root.as_ref()?.reborrow();
         root_node.last_leaf_edge().left_kv().ok().map(Handle::into_kv)
     }
@@ -861,11 +864,7 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
     /// assert_eq!(*map.get(&1).unwrap(), "a");
     /// assert_eq!(*map.get(&2).unwrap(), "last");
     /// ```
-    pub fn last_entry(&mut self) -> Option<OccupiedEntry<'_, K, V, O, A>>
-    where
-        K: SortableByWithOrder<O>,
-        O: TotalOrder,
-    {
+    pub fn last_entry(&mut self) -> Option<OccupiedEntry<'_, K, V, O, A>> {
         let (map, dormant_map) = DormantMutRef::new(self);
         let root_node = map.root.as_mut()?.borrow_mut();
         let kv = root_node.last_leaf_edge().left_kv().ok()?;
@@ -895,11 +894,7 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
     /// }
     /// assert!(map.is_empty());
     /// ```
-    pub fn pop_last(&mut self) -> Option<(K, V)>
-    where
-        K: SortableByWithOrder<O>,
-        O: TotalOrder,
-    {
+    pub fn pop_last(&mut self) -> Option<(K, V)> {
         self.last_entry().map(|entry| entry.remove_entry())
     }
 
@@ -920,13 +915,11 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
     /// assert_eq!(map.contains_key(&1), true);
     /// assert_eq!(map.contains_key(&2), false);
     /// ```
-    pub fn contains_key<Q: ?Sized>(&self, key: &Q) -> bool
+    pub fn contains_key<C>(&self, comp: C) -> bool
     where
-        K: SortableByWithOrder<O>,
-        Q: SortableByWithOrder<O>,
-        O: TotalOrder,
+        C: FnMut(&K) -> Ordering,
     {
-        self.get(key).is_some()
+        self.get(comp).is_some()
     }
 
     /// Returns a mutable reference to the value corresponding to the key.
@@ -949,14 +942,12 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
     /// assert_eq!(map[&1], "b");
     /// ```
     // See `get` for implementation notes, this is basically a copy-paste with mut's added
-    pub fn get_mut<Q: ?Sized>(&mut self, key: &Q) -> Option<&mut V>
+    pub fn get_mut<C>(&mut self, comp: C) -> Option<&mut V>
     where
-        K: SortableByWithOrder<O>,
-        Q: SortableByWithOrder<O>,
-        O: TotalOrder,
+        C: FnMut(&K) -> Ordering,
     {
         let root_node = self.root.as_mut()?.borrow_mut();
-        match root_node.search_tree(key, &self.order) {
+        match root_node.search_tree(comp) {
             Found(handle) => Some(handle.into_val_mut()),
             GoDown(_) => None,
         }
@@ -1053,13 +1044,11 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
     /// assert_eq!(map.remove(&1), Some("a"));
     /// assert_eq!(map.remove(&1), None);
     /// ```
-    pub fn remove<Q: ?Sized>(&mut self, key: &Q) -> Option<V>
+    pub fn remove<C>(&mut self, comp: C) -> Option<V>
     where
-        K: SortableByWithOrder<O>,
-        Q: SortableByWithOrder<O>,
-        O: TotalOrder,
+        C: FnMut(&K) -> Ordering,
     {
-        self.remove_entry(key).map(|(_, v)| v)
+        self.remove_entry(comp).map(|(_, v)| v)
     }
 
     /// Removes a key from the map, returning the stored key and value if the key
@@ -1080,15 +1069,13 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
     /// assert_eq!(map.remove_entry(&1), Some((1, "a")));
     /// assert_eq!(map.remove_entry(&1), None);
     /// ```
-    pub fn remove_entry<Q: ?Sized>(&mut self, key: &Q) -> Option<(K, V)>
+    pub fn remove_entry<C>(&mut self, comp: C) -> Option<(K, V)>
     where
-        K: SortableByWithOrder<O>,
-        Q: SortableByWithOrder<O>,
-        O: TotalOrder,
+        C: FnMut(&K) -> Ordering,
     {
         let (map, dormant_map) = DormantMutRef::new(self);
         let root_node = map.root.as_mut()?.borrow_mut();
-        match root_node.search_tree(key, &map.order) {
+        match root_node.search_tree(comp) {
             Found(handle) => Some(
                 OccupiedEntry {
                     handle,
@@ -1120,8 +1107,6 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
     #[inline]
     pub fn retain<F>(&mut self, mut f: F)
     where
-        K: SortableByWithOrder<O>,
-        O: TotalOrder,
         F: FnMut(&K, &mut V) -> bool,
     {
         self.drain_filter(|k, v| !f(k, v));
@@ -1158,10 +1143,9 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
     /// assert_eq!(a[&4], "e");
     /// assert_eq!(a[&5], "f");
     /// ```
-    pub fn append(&mut self, other: &mut Self)
+    pub fn append<C>(&mut self, other: &mut Self, mega_comp: C)
     where
-        K: SortableByWithOrder<O>,
-        O: Clone + TotalOrder,
+        C: FnMut(&(K, V), &(K, V)) -> Ordering,
         A: Clone,
     {
         // Do we have to append anything at all?
@@ -1175,17 +1159,14 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
             return;
         }
 
-        let self_iter =
-            mem::replace(self, Self::new_in(self.order.clone(), (*self.alloc).clone())).into_iter();
-        let other_iter =
-            mem::replace(other, Self::new_in(self.order.clone(), (*self.alloc).clone()))
-                .into_iter();
+        let self_iter = mem::replace(self, Self::new_in((*self.alloc).clone())).into_iter();
+        let other_iter = mem::replace(other, Self::new_in((*self.alloc).clone())).into_iter();
         let root = self.root.get_or_insert_with(|| Root::new((*self.alloc).clone()));
         root.append_from_sorted_iters(
             self_iter,
             other_iter,
             &mut self.length,
-            |a: &(K, V), b: &(K, V)| self.order.cmp_any(&a.0, &b.0),
+            |a: &(K, V), b: &(K, V)| mega_comp(a, b),
             (*self.alloc).clone(),
         )
     }
@@ -1219,15 +1200,26 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
     /// }
     /// assert_eq!(Some((&5, &"b")), map.range(4..).next());
     /// ```
-    pub fn range<T: ?Sized, R>(&self, range: R) -> Range<'_, K, V>
+    pub fn range<C1, C2>(
+        &self,
+        lower_comp: C1,
+        lower_bound: SearchBound,
+        upper_comp: C2,
+        upper_bound: SearchBound,
+    ) -> Range<'_, K, V>
     where
-        T: SortableByWithOrder<O>,
-        K: SortableByWithOrder<O>,
-        O: TotalOrder,
-        R: RangeBounds<T>,
+        C1: FnMut(&K) -> Ordering,
+        C2: FnMut(&K) -> Ordering,
     {
         if let Some(root) = &self.root {
-            Range { inner: root.reborrow().range_search(&self.order, range) }
+            Range {
+                inner: root.reborrow().range_search(
+                    lower_comp,
+                    lower_bound,
+                    upper_comp,
+                    upper_bound,
+                ),
+            }
         } else {
             Range { inner: LeafRange::none() }
         }
@@ -1261,16 +1253,25 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
     ///     println!("{name} => {balance}");
     /// }
     /// ```
-    pub fn range_mut<T: ?Sized, R>(&mut self, range: R) -> RangeMut<'_, K, V>
+    pub fn range_mut<C1, C2>(
+        &mut self,
+        lower_comp: C1,
+        lower_bound: SearchBound,
+        upper_comp: C2,
+        upper_bound: SearchBound,
+    ) -> RangeMut<'_, K, V>
     where
-        T: SortableByWithOrder<O>,
-        K: SortableByWithOrder<O>,
-        O: TotalOrder,
-        R: RangeBounds<T>,
+        C1: FnMut(&K) -> Ordering,
+        C2: FnMut(&K) -> Ordering,
     {
         if let Some(root) = &mut self.root {
             RangeMut {
-                inner: root.borrow_valmut().range_search(&self.order, range),
+                inner: root.borrow_valmut().range_search(
+                    lower_comp,
+                    lower_bound,
+                    upper_comp,
+                    upper_bound,
+                ),
                 _marker: PhantomData,
             }
         } else {
@@ -1298,10 +1299,9 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
     /// assert_eq!(count["b"], 2);
     /// assert_eq!(count["c"], 1);
     /// ```
-    pub fn entry(&mut self, key: K) -> Entry<'_, K, V, O, A>
+    pub fn entry<C>(&mut self, key: K, comp: C) -> Entry<'_, K, V, O, A>
     where
-        K: SortableByWithOrder<O>,
-        O: TotalOrder,
+        C: FnMut(&K) -> Ordering,
     {
         let (map, dormant_map) = DormantMutRef::new(self);
         match map.root {
@@ -1312,7 +1312,7 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
                 alloc: (*map.alloc).clone(),
                 _marker: PhantomData,
             }),
-            Some(ref mut root) => match root.borrow_mut().search_tree(&key, &map.order) {
+            Some(ref mut root) => match root.borrow_mut().search_tree(comp) {
                 Found(handle) => Occupied(OccupiedEntry {
                     handle,
                     dormant_map,
@@ -1359,21 +1359,18 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
     /// assert_eq!(b[&17], "d");
     /// assert_eq!(b[&41], "e");
     /// ```
-    pub fn split_off<Q: ?Sized>(&mut self, key: &Q) -> Self
+    pub fn split_off<C>(&mut self, comp: C) -> Self
     where
-        K: SortableByWithOrder<O>,
-        Q: SortableByWithOrder<O>,
-        O: Clone + TotalOrder,
-        A: Clone,
+        C: FnMut(&K) -> Ordering,
     {
         if self.is_empty() {
-            return Self::new_in(self.order.clone(), (*self.alloc).clone());
+            return Self::new_in((*self.alloc).clone());
         }
 
         let total_num = self.len();
         let left_root = self.root.as_mut().unwrap(); // unwrap succeeds because not empty
 
-        let right_root = left_root.split_off(key, &self.order, (*self.alloc).clone());
+        let right_root = left_root.split_off(comp, (*self.alloc).clone());
 
         let (new_left_len, right_len) = Root::calc_split_length(total_num, &left_root, &right_root);
         self.length = new_left_len;
@@ -1381,7 +1378,7 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
         BTreeMap {
             root: Some(right_root),
             length: right_len,
-            order: self.order.clone(),
+            order: self.order,
             alloc: self.alloc.clone(),
             _marker: PhantomData,
         }
@@ -1424,8 +1421,6 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
         }
         fn drain_filter<F>(&mut self, pred: F) -> DrainFilter<'_, K, V, F, A>
         where
-            K: SortableByWithOrder<O>,
-            O: TotalOrder,
             F: FnMut(&K, &mut V) -> bool,
         {
             let (inner, alloc) = self.drain_filter_inner();
@@ -1434,9 +1429,6 @@ impl<K, V, O, A: Allocator + Clone> BTreeMap<K, V, O, A> {
     }
 
     pub(super) fn drain_filter_inner(&mut self) -> (DrainFilterInner<'_, K, V>, A)
-    where
-        K: SortableByWithOrder<O>,
-        O: TotalOrder,
     {
         if let Some(root) = self.root.as_mut() {
             let (root, dormant_root) = DormantMutRef::new(root);
@@ -1577,7 +1569,7 @@ impl<K: SortableByWithOrder<O>, V, O: TotalOrder, A: Allocator + Clone> Drop
             let casted = &mut *(self.0 as *mut _ as *mut BTreeMap<K, V, ManuallyDrop<O>, A>);
             let order = ManuallyDrop::take(&mut casted.order);
             let alloc = ManuallyDrop::take(&mut casted.alloc);
-            let original = mem::replace(casted, BTreeMap::new_in(ManuallyDrop::new(order), alloc));
+            let original = mem::replace(casted, BTreeMap::new_in(alloc));
             self.0.extend(original);
         }
     }
