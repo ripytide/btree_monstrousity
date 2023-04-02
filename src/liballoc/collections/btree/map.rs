@@ -1174,9 +1174,9 @@ impl<K, V, A: Allocator + Clone> BTreeMap<K, V, A> {
     pub fn range<C1, C2>(
         &self,
         lower_comp: C1,
-        lower_bound: SearchBound,
+        lower_bound: SearchBoundCustom,
         upper_comp: C2,
-        upper_bound: SearchBound,
+        upper_bound: SearchBoundCustom,
     ) -> Range<'_, K, V>
     where
         C1: FnMut(&K) -> Ordering,
@@ -1186,9 +1186,9 @@ impl<K, V, A: Allocator + Clone> BTreeMap<K, V, A> {
             Range {
                 inner: root.reborrow().range_search(
                     lower_comp,
-                    lower_bound,
+                    SearchBound::from(lower_bound),
                     upper_comp,
-                    upper_bound,
+                    SearchBound::from(upper_bound),
                 ),
             }
         } else {
