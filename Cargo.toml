@@ -1,6 +1,6 @@
 [package]
-name = "btreemap_monstousity"
-version = "0.0.1"
+name = "btree_monstousity"
+version = "0.0.2"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/ripytide/btree_monstrousity"
 description = "a code port of BTreeMap but with comparator functions"
