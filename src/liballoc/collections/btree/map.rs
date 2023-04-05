@@ -309,10 +309,7 @@ impl<K: Clone, V: Clone, A: Allocator + Clone> Clone for BTreeMap<K, V, A> {
         if self.is_empty() {
             BTreeMap::new_in((*self.alloc).clone())
         } else {
-            clone_subtree(
-                self.root.as_ref().unwrap().reborrow(),
-                (*self.alloc).clone(),
-            ) // unwrap succeeds because not empty
+            clone_subtree(self.root.as_ref().unwrap().reborrow(), (*self.alloc).clone()) // unwrap succeeds because not empty
         }
     }
 }
@@ -2244,27 +2241,27 @@ impl<K: Debug, V: Debug, A: Allocator + Clone> Debug for BTreeMap<K, V, A> {
 
 //todo consider turning me back on
 //impl<K, V, const N: usize> From<[(K, V); N]>
-    //for BTreeMap<K, V>
+//for BTreeMap<K, V>
 //{
-    ///// Converts a `[(K, V); N]` into a `BTreeMap<(K, V)>`.
-    /////
-    ///// ```
-    ///// use copse::BTreeMap;
-    /////
-    ///// let map1 = BTreeMap::from([(1, 2), (3, 4)]);
-    ///// let map2: BTreeMap<_, _> = [(1, 2), (3, 4)].into();
-    ///// assert_eq!(map1, map2);
-    ///// ```
-    //fn from(mut arr: [(K, V); N]) -> Self {
-        //if N == 0 {
-            //return BTreeMap::new();
-        //}
+///// Converts a `[(K, V); N]` into a `BTreeMap<(K, V)>`.
+/////
+///// ```
+///// use copse::BTreeMap;
+/////
+///// let map1 = BTreeMap::from([(1, 2), (3, 4)]);
+///// let map2: BTreeMap<_, _> = [(1, 2), (3, 4)].into();
+///// assert_eq!(map1, map2);
+///// ```
+//fn from(mut arr: [(K, V); N]) -> Self {
+//if N == 0 {
+//return BTreeMap::new();
+//}
 
-        //// use stable sort to preserve the insertion order.
-        //let order = O::default();
-        //arr.sort_by(|a, b| order.cmp_any(&a.0, &b.0));
-        //BTreeMap::bulk_build_from_sorted_iter(arr, order, Global)
-    //}
+//// use stable sort to preserve the insertion order.
+//let order = O::default();
+//arr.sort_by(|a, b| order.cmp_any(&a.0, &b.0));
+//BTreeMap::bulk_build_from_sorted_iter(arr, order, Global)
+//}
 //}
 
 impl<K, V, A: Allocator + Clone> BTreeMap<K, V, A> {
@@ -2468,17 +2465,15 @@ impl<K, V, A: Allocator + Clone> BTreeMap<K, V, A> {
     /// assert_eq!(cursor.key(), Some(&3));
     /// ```
     #[cfg(feature = "btree_cursors")]
-    pub fn lower_bound<Q>(&self, bound: Bound<&Q>) -> Cursor<'_, K, V>
+    pub fn lower_bound<C>(&self, comp: C, bound: SearchBoundCustom) -> Cursor<'_, K, V>
     where
-        K: SortableByWithOrder<O>,
-        Q: SortableByWithOrder<O>,
-        O: TotalOrder,
+        C: FnMut(&K) -> Ordering,
     {
         let root_node = match self.root.as_ref() {
             None => return Cursor { current: None, root: None },
             Some(root) => root.reborrow(),
         };
-        let edge = root_node.lower_bound(&self.order, SearchBound::from_range(bound));
+        let edge = root_node.lower_bound(comp, SearchBound::from(bound));
         Cursor { current: edge.next_kv().ok(), root: self.root.as_ref() }
     }
 
@@ -2508,11 +2503,13 @@ impl<K, V, A: Allocator + Clone> BTreeMap<K, V, A> {
     /// assert_eq!(cursor.key(), Some(&3));
     /// ```
     #[cfg(feature = "btree_cursors")]
-    pub fn lower_bound_mut<Q>(&mut self, bound: Bound<&Q>) -> CursorMut<'_, K, V, A>
+    pub fn lower_bound_mut<C>(
+        &mut self,
+        comp: C,
+        bound: SearchBoundCustom,
+    ) -> CursorMut<'_, K, V, A>
     where
-        K: SortableByWithOrder<O>,
-        Q: SortableByWithOrder<O>,
-        O: TotalOrder,
+        C: FnMut(&K) -> Ordering,
     {
         let (root, dormant_root) = DormantMutRef::new(&mut self.root);
         let root_node = match root.as_mut() {
@@ -2526,7 +2523,7 @@ impl<K, V, A: Allocator + Clone> BTreeMap<K, V, A> {
             }
             Some(root) => root.borrow_mut(),
         };
-        let edge = root_node.lower_bound(&self.order, SearchBound::from_range(bound));
+        let edge = root_node.lower_bound(comp, SearchBound::from(bound));
         CursorMut {
             current: edge.next_kv().ok(),
             root: dormant_root,
@@ -2561,17 +2558,15 @@ impl<K, V, A: Allocator + Clone> BTreeMap<K, V, A> {
     /// assert_eq!(cursor.key(), Some(&2));
     /// ```
     #[cfg(feature = "btree_cursors")]
-    pub fn upper_bound<Q>(&self, bound: Bound<&Q>) -> Cursor<'_, K, V>
+    pub fn upper_bound<C>(&self, comp: C, bound: SearchBoundCustom) -> Cursor<'_, K, V>
     where
-        K: SortableByWithOrder<O>,
-        Q: SortableByWithOrder<O>,
-        O: TotalOrder,
+        C: FnMut(&K) -> Ordering,
     {
         let root_node = match self.root.as_ref() {
             None => return Cursor { current: None, root: None },
             Some(root) => root.reborrow(),
         };
-        let edge = root_node.upper_bound(&self.order, SearchBound::from_range(bound));
+        let edge = root_node.upper_bound(comp, SearchBound::from(bound));
         Cursor { current: edge.next_back_kv().ok(), root: self.root.as_ref() }
     }
 
@@ -2601,11 +2596,13 @@ impl<K, V, A: Allocator + Clone> BTreeMap<K, V, A> {
     /// assert_eq!(cursor.key(), Some(&2));
     /// ```
     #[cfg(feature = "btree_cursors")]
-    pub fn upper_bound_mut<Q>(&mut self, bound: Bound<&Q>) -> CursorMut<'_, K, V, A>
+    pub fn upper_bound_mut<C>(
+        &mut self,
+        comp: C,
+        bound: SearchBoundCustom,
+    ) -> CursorMut<'_, K, V, A>
     where
-        K: SortableByWithOrder<O>,
-        Q: SortableByWithOrder<O>,
-        O: TotalOrder,
+        C: FnMut(&K) -> Ordering,
     {
         let (root, dormant_root) = DormantMutRef::new(&mut self.root);
         let root_node = match root.as_mut() {
@@ -2619,7 +2616,7 @@ impl<K, V, A: Allocator + Clone> BTreeMap<K, V, A> {
             }
             Some(root) => root.borrow_mut(),
         };
-        let edge = root_node.upper_bound(&self.order, SearchBound::from_range(bound));
+        let edge = root_node.upper_bound(comp, SearchBound::from(bound));
         CursorMut {
             current: edge.next_back_kv().ok(),
             root: dormant_root,

@@ -9,6 +9,7 @@ keywords = ["b-tree", "collections"]
 categories = ["data-structures", "no-std"]
 
 [features]
+default = ["btree_cursors"]
 allocator_api = []
 btreemap_alloc = ["allocator_api"]
 core_intrinsics = []

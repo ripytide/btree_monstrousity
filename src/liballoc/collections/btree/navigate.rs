@@ -6,6 +6,7 @@ use core::ptr;
 use super::node::{marker, ForceResult::*, Handle, NodeRef};
 use super::search::SearchBound;
 
+use crate::btree_map::SearchBoundCustom;
 use crate::polyfill::*;
 // `front` and `back` are always both `None` or both `Some`.
 pub struct LeafRange<BorrowType, K, V> {
@@ -261,7 +262,12 @@ impl<BorrowType: marker::BorrowType, K, V> NodeRef<BorrowType, K, V, marker::Lea
         C1: FnMut(&K) -> Ordering,
         C2: FnMut(&K) -> Ordering,
     {
-        match self.search_tree_for_bifurcation(&mut lower_comp, lower_bound, &mut upper_comp, upper_bound) {
+        match self.search_tree_for_bifurcation(
+            &mut lower_comp,
+            lower_bound,
+            &mut upper_comp,
+            upper_bound,
+        ) {
             Err(_) => LeafRange::none(),
             Ok((
                 node,
@@ -276,10 +282,12 @@ impl<BorrowType: marker::BorrowType, K, V> NodeRef<BorrowType, K, V, marker::Lea
                     match (lower_edge.force(), upper_edge.force()) {
                         (Leaf(f), Leaf(b)) => return LeafRange { front: Some(f), back: Some(b) },
                         (Internal(f), Internal(b)) => {
-                            (lower_edge, lower_child_bound) =
-                                f.descend().find_lower_bound_edge(&mut lower_comp, lower_child_bound);
-                            (upper_edge, upper_child_bound) =
-                                b.descend().find_upper_bound_edge(&mut upper_comp, upper_child_bound);
+                            (lower_edge, lower_child_bound) = f
+                                .descend()
+                                .find_lower_bound_edge(&mut lower_comp, lower_child_bound);
+                            (upper_edge, upper_child_bound) = b
+                                .descend()
+                                .find_upper_bound_edge(&mut upper_comp, upper_child_bound);
                         }
                         _ => unreachable!("BTreeMap has different depths"),
                     }
@@ -741,19 +749,17 @@ impl<BorrowType: marker::BorrowType, K, V>
 impl<BorrowType: marker::BorrowType, K, V> NodeRef<BorrowType, K, V, marker::LeafOrInternal> {
     /// Returns the leaf edge corresponding to the first point at which the
     /// given bound is true.
-    pub fn lower_bound<Q: ?Sized, O>(
+    pub fn lower_bound<C>(
         self,
-        order: &O,
-        mut bound: SearchBound<&Q>,
+        mut comp: C,
+        mut bound: SearchBound,
     ) -> Handle<NodeRef<BorrowType, K, V, marker::Leaf>, marker::Edge>
     where
-        K: SortableByWithOrder<O>,
-        Q: SortableByWithOrder<O>,
-        O: TotalOrder,
+        C: FnMut(&K) -> Ordering,
     {
         let mut node = self;
         loop {
-            let (edge, new_bound) = node.find_lower_bound_edge(order, bound);
+            let (edge, new_bound) = node.find_lower_bound_edge(&mut comp, bound);
             match edge.force() {
                 Leaf(edge) => return edge,
                 Internal(edge) => {
@@ -766,19 +772,17 @@ impl<BorrowType: marker::BorrowType, K, V> NodeRef<BorrowType, K, V, marker::Lea
 
     /// Returns the leaf edge corresponding to the last point at which the
     /// given bound is true.
-    pub fn upper_bound<Q: ?Sized, O>(
+    pub fn upper_bound<C>(
         self,
-        order: &O,
-        mut bound: SearchBound<&Q>,
+        mut comp: C,
+        mut bound: SearchBound,
     ) -> Handle<NodeRef<BorrowType, K, V, marker::Leaf>, marker::Edge>
     where
-        K: SortableByWithOrder<O>,
-        Q: SortableByWithOrder<O>,
-        O: TotalOrder,
+        C: FnMut(&K) -> Ordering,
     {
         let mut node = self;
         loop {
-            let (edge, new_bound) = node.find_upper_bound_edge(order, bound);
+            let (edge, new_bound) = node.find_upper_bound_edge(&mut comp, bound);
             match edge.force() {
                 Leaf(edge) => return edge,
                 Internal(edge) => {
