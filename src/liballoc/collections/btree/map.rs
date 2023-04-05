@@ -2966,7 +2966,7 @@ impl<'a, K, V, A> CursorMut<'a, K, V, A> {
 
 // Now the tree editing operations
 #[cfg(feature = "btree_cursors")]
-impl<'a, K: Ord, V, A: Allocator + Clone> CursorMut<'a, K, V, A> {
+impl<'a, K, V, A: Allocator + Clone> CursorMut<'a, K, V, A> {
     /// Inserts a new element into the `BTreeMap` after the current one.
     ///
     /// If the cursor is pointing at the "ghost" non-element then the new element is
@@ -3066,17 +3066,8 @@ impl<'a, K: Ord, V, A: Allocator + Clone> CursorMut<'a, K, V, A> {
     /// - the given key compares greater than or equal to the next element (if
     ///   any).
     #[cfg(feature = "btree_cursors")]
-    pub fn insert_after(&mut self, key: K, value: V) {
-        if let Some(current) = self.key() {
-            if &key <= current {
-                panic!("key must be ordered above the current element");
-            }
-        }
-        if let Some((next, _)) = self.peek_prev() {
-            if &key >= next {
-                panic!("key must be ordered below the next element");
-            }
-        }
+    pub fn insert_after(&mut self, key: K, value: V)
+    {
         unsafe {
             self.insert_after_unchecked(key, value);
         }
@@ -3096,16 +3087,6 @@ impl<'a, K: Ord, V, A: Allocator + Clone> CursorMut<'a, K, V, A> {
     ///   any).
     #[cfg(feature = "btree_cursors")]
     pub fn insert_before(&mut self, key: K, value: V) {
-        if let Some(current) = self.key() {
-            if &key >= current {
-                panic!("key must be ordered below the current element");
-            }
-        }
-        if let Some((prev, _)) = self.peek_prev() {
-            if &key <= prev {
-                panic!("key must be ordered above the previous element");
-            }
-        }
         unsafe {
             self.insert_before_unchecked(key, value);
         }
