@@ -1,6 +1,6 @@
 [package]
 name = "btree_monstrousity"
-version = "0.0.1"
+version = "0.0.2"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/ripytide/btree_monstrousity"
 description = "a code port of BTreeMap but with comparator functions"
@@ -9,7 +9,6 @@ keywords = ["b-tree", "collections"]
 categories = ["data-structures", "no-std"]
 
 [features]
-default = ["btree_cursors"]
 allocator_api = []
 btreemap_alloc = ["allocator_api"]
 core_intrinsics = []
