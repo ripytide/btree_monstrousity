@@ -1224,9 +1224,9 @@ impl<K, V, A: Allocator + Clone> BTreeMap<K, V, A> {
     pub fn range_mut<C1, C2>(
         &mut self,
         lower_comp: C1,
-        lower_bound: SearchBound,
+        lower_bound: SearchBoundCustom,
         upper_comp: C2,
-        upper_bound: SearchBound,
+        upper_bound: SearchBoundCustom,
     ) -> RangeMut<'_, K, V>
     where
         C1: FnMut(&K) -> Ordering,
@@ -1236,9 +1236,9 @@ impl<K, V, A: Allocator + Clone> BTreeMap<K, V, A> {
             RangeMut {
                 inner: root.borrow_valmut().range_search(
                     lower_comp,
-                    lower_bound,
+                    SearchBound::from(lower_bound),
                     upper_comp,
-                    upper_bound,
+                    SearchBound::from(upper_bound),
                 ),
                 _marker: PhantomData,
             }
@@ -3066,8 +3066,7 @@ impl<'a, K, V, A: Allocator + Clone> CursorMut<'a, K, V, A> {
     /// - the given key compares greater than or equal to the next element (if
     ///   any).
     #[cfg(feature = "btree_cursors")]
-    pub fn insert_after(&mut self, key: K, value: V)
-    {
+    pub fn insert_after(&mut self, key: K, value: V) {
         unsafe {
             self.insert_after_unchecked(key, value);
         }
