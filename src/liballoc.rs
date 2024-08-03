@@ -32,10 +32,8 @@ pub mod collections {
     //#[cfg(not(no_global_oom_handling))]
     //pub mod binary_heap;
 
-    #[cfg(not(no_global_oom_handling))]
     mod btree;
 
-    #[cfg(not(no_global_oom_handling))]
     pub mod btree_map {
         //! An ordered map based on a B-Tree.
         pub use super::btree::map::*;

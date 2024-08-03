@@ -1,12 +1,12 @@
 use core::iter::Peekable;
 
-/// A iterator for deduping the key of a sorted iterator.
-/// When encountering the duplicated key, only the last key-value pair is yielded.
-///
-/// Used by [`BTreeMap::bulk_build_from_sorted_iter`][1].
-///
-/// [1]: crate::collections::BTreeMap::bulk_build_from_sorted_iter
-struct DeleteMe;
+// A iterator for deduping the key of a sorted iterator.
+// When encountering the duplicated key, only the last key-value pair is yielded.
+//
+// Used by [`BTreeMap::bulk_build_from_sorted_iter`][1].
+//
+// [1]: crate::collections::BTreeMap::bulk_build_from_sorted_iter
+//struct DeleteMe;
 
 //todo consider turning me back on
 //pub struct DedupSortedIter<K, V, I>
