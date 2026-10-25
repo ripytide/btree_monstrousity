@@ -125,7 +125,16 @@ mod definitions {
                     unsafe {
                         let layout = Layout::new::<MaybeUninit<T>>();
                         match alloc.allocate(layout) {
-                            Ok(ptr) => <A!(Box<_, _>)>::from_raw_in(ptr.cast().as_ptr(), alloc),
+                            Ok(ptr) => {
+                                cfg_if! {
+                                    if #[cfg(feature = "allocator_api")] {
+                                        <A!(Box<_, _>)>::from_raw_in(ptr.cast().as_ptr(), alloc)
+                                    } else {
+                                        let _ = alloc;
+                                        <A!(Box<_, _>)>::from_raw(ptr.cast().as_ptr())
+                                    }
+                                }
+                            }
                             Err(_) => alloc::alloc::handle_alloc_error(layout),
                         }
                     }
